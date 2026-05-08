@@ -13,11 +13,11 @@ run:
 
 sync:
 	@echo "🔄 Running sync_git_deps.py with mode: $(MODE)"
-	python sync_git_deps.py --mode "$(MODE)"
+	python3 sync_git_deps.py --mode "$(MODE)"
 
 sync-dry-run:
 	@echo "🔍 Dry-run sync for validation (mode: $(MODE))"
-	python sync_git_deps.py --mode "$(MODE)" --dry-run
+	python3 sync_git_deps.py --mode "$(MODE)" --dry-run
 
 install-hooks:
 	@echo "Installing git hooks..."

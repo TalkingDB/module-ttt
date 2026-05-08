@@ -111,27 +111,27 @@ def main():
         if not local_path.exists():
             print(f"⚠ {pkg}: local path missing ({local_path})")
 
+        commit = get_latest_commit(local_path, git_url) if args.mode == "git" else None
+
         for line in pyproject_text.splitlines():
             stripped = line.strip()
 
             # --- PATH dependency ---
             if PATH_DEP_PATTERN.match(stripped) and stripped.startswith(pkg):
                 if args.mode == "git":
-                    rev = get_latest_commit(local_path, git_url)
-                    new_line = f'{pkg} = {{ git = "{git_url}", rev = "{rev}" }}'
+                    new_line = f'{pkg} = {{ git = "{git_url}", rev = "{commit}" }}'
                     updates[line] = new_line
-                    print(f"→ {pkg}: local → git @ {rev}")
+                    print(f"→ {pkg}: local → git @ rev={commit}")
                 break
 
             # --- GIT dependency ---
             if GIT_DEP_PATTERN.match(stripped) and stripped.startswith(pkg):
                 if args.mode == "git":
-                    rev = get_latest_commit(local_path, git_url)
-                    new_line = f'{pkg} = {{ git = "{git_url}", rev = "{rev}" }}'
+                    new_line = f'{pkg} = {{ git = "{git_url}", rev = "{commit}" }}'
                     if line.strip() != new_line.strip():
                         updates[line] = new_line
                         if args.dry_run:
-                            print(f"→ {pkg}: would update")
+                            print(f"→ {pkg}: would update to rev={commit}")
 
                 elif args.mode == "local":
                     new_line = f'{pkg} = {{ path = "{cfg["local_path"]}", develop = true }}'
