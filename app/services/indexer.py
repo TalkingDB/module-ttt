@@ -2,8 +2,12 @@ import time
 import os
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Tuple, Dict, Any
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
+
+# Called as ``progress(done_units, total_units)`` during indexing.
+# Any exception raised by the callback aborts indexing immediately.
+ProgressCallback = Callable[[int, int], None]
 
 from tqdm import tqdm
 
@@ -270,7 +274,16 @@ class IndexerService:
 
         return nodes, edges
 
-    def index_document(self, document: DocumentModel) -> GraphModel:
+    def index_document(
+        self,
+        document: DocumentModel,
+        progress: Optional[ProgressCallback] = None,
+    ) -> GraphModel:
+        """Index all document elements into the graph.
+
+        ``progress`` receives ``(done_units, total_units)`` updates during
+        execution. Exceptions raised by the callback abort indexing.
+        """
 
         start_time = time.time()
         elements = list(document.iter_elements())
@@ -338,19 +351,32 @@ class IndexerService:
                             )
                         )
 
-            for future in tqdm(
-                as_completed(futures),
-                total=len(futures),
-                desc="Indexing tasks",
-                unit="task",
-            ):
-                result = future.result()
-                if not result:
-                    continue
+            total = len(futures)
+            if progress is not None:
+                progress(0, total)
 
-                nodes, edges = result
-                all_nodes.extend(nodes)
-                all_edges.extend(edges)
+            done = 0
+            try:
+                for future in tqdm(
+                    as_completed(futures),
+                    total=total,
+                    desc="Indexing tasks",
+                    unit="task",
+                ):
+                    result = future.result()
+                    done += 1
+
+                    if result:
+                        nodes, edges = result
+                        all_nodes.extend(nodes)
+                        all_edges.extend(edges)
+
+                    if progress is not None:
+                        progress(done, total)
+            except BaseException:
+                for pending in futures:
+                    pending.cancel()
+                raise
 
         logger.info(
             f"Collected {len(all_nodes)} nodes and {len(all_edges)} edges"
