@@ -22,7 +22,7 @@ sync-dry-run:
 install-hooks:
 	@echo "Installing git hooks..."
 	@cp -f git-hooks/* .git/hooks/
-	@chmod +x .git/hooks/*
+	@chmod +x .git/hooks/* 2>/dev/null || true
 	@echo "Git hooks installed!"
 
 docker-publish:
