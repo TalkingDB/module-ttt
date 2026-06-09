@@ -6,10 +6,10 @@ MODE ?= $(DEFAULT_MODE)
 .DEFAULT_GOAL := help
 
 local:
-	poetry run python -m spacy download en_core_web_md && poetry run python -m debugpy --listen 0.0.0.0:5690 -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --loop uvloop --http httptools --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer
+	infisical run --watch -- poetry run python -m debugpy --listen 0.0.0.0:5690 -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --loop uvloop --http httptools --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer
 
 run:
-	poetry run python -m spacy download en_core_web_md && poetry run python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --workers 4 --loop uvloop --http httptools
+	infisical run -- poetry run python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --workers 4 --loop uvloop --http httptools
 
 sync:
 	@echo "🔄 Running sync_git_deps.py with mode: $(MODE)"
