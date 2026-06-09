@@ -4,9 +4,9 @@ set -euo pipefail
 APP_NAME="module-talkingdb"
 IMAGE="$APP_NAME"
 
-GCP_PROJECT="smarter-codes-website"
-ARTIFACT_REPO="tdb"
-ARTIFACT_REGION="us-central1"
+GCP_PROJECT="${GCP_PROJECT:-talkingdb-40099}"
+ARTIFACT_REPO="${ARTIFACT_REPO:-tdb}"
+ARTIFACT_REGION="${ARTIFACT_REGION:-us-central1}"
 
 REGISTRY_HOST="${ARTIFACT_REGION}-docker.pkg.dev"
 REMOTE_IMAGE="$REGISTRY_HOST/$GCP_PROJECT/$ARTIFACT_REPO/$IMAGE"
