@@ -1,7 +1,7 @@
 [project]
-name = "module-talkingdb"
+name = "module-ttt"
 version = "2.0.0"
-description = "Central module implementing TalkingDB's symbolic reasoning workflows."
+description = "Module implementing TalkingDB's symbolic text to tree workflows."
 authors = [
     { name = "immkg", email = "mayank.g@smarter.codes" }
 ]

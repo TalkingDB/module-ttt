@@ -1,6 +1,6 @@
 # About
 
-Central module implementing TalkingDB's symbolic reasoning workflows.
+Module implementing TalkingDB's symbolic text to tree workflows.
 
 ## Code Contributor
 
