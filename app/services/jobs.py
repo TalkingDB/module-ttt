@@ -105,6 +105,7 @@ def run_job(
         return
 
     ctx = JobContext(job_id=job_id)
+    ctx.start_background_heartbeat()
     graph_id: Optional[str] = None
     result_summary = None
 
@@ -193,6 +194,8 @@ def run_job(
             error_message=error_message,
             status_message="Upload failed",
         )
+    finally:
+        ctx.stop_background_heartbeat()
 
 
 # ------------------------------------------------------------- pipeline steps
@@ -254,15 +257,7 @@ def _finalize(
     error_message: Optional[str] = None,
     status_message: Optional[str] = None,
 ) -> None:
-    """Run cleanup and apply the terminal job transition."""
-    rollback_ms: Optional[int] = None
-    if terminal_state != JobState.COMPLETED:
-        rollback_start = time.monotonic()
-        rollback_graph(graph_id)
-        rollback_ms = int((time.monotonic() - rollback_start) * 1000)
-
-    spool.discard(temp_path)
-
+    """Apply the terminal job transition, then run cleanup if we won it."""
     with sqlite_conn() as conn:
         won = job_store.finalize(
             conn,
@@ -274,16 +269,26 @@ def _finalize(
             error_message=error_message,
             status_message=status_message,
         )
-        if won:
-            terminal_job = job_store.get(conn, job_id)
-            if terminal_job is not None:
-                emit_lifecycle(terminal_job, rollback_ms=rollback_ms)
 
     if not won:
         logger.info(
             f"[job {job_id}] finalize lost the race; "
             f"current row already terminal"
         )
+        return
+
+    rollback_ms: Optional[int] = None
+    if terminal_state != JobState.COMPLETED:
+        rollback_start = time.monotonic()
+        rollback_graph(graph_id)
+        rollback_ms = int((time.monotonic() - rollback_start) * 1000)
+
+    spool.discard(temp_path)
+
+    with sqlite_conn() as conn:
+        terminal_job = job_store.get(conn, job_id)
+    if terminal_job is not None:
+        emit_lifecycle(terminal_job, rollback_ms=rollback_ms)
 
 
 def finalize_externally(

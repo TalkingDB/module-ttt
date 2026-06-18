@@ -45,6 +45,13 @@ STALE_THRESHOLD_SECONDS = _int("TDB_JOB_STALE_THRESHOLD_SECONDS", 5 * 60)
 # checked worker-side at checkpoints with the lifecycle daemon as backstop.
 MAX_JOB_DURATION_SECONDS = _int("TDB_JOB_MAX_DURATION_SECONDS", 30 * 60)
 
+# A background timer refreshes the heartbeat at this cadence for as long as a
+# job is being processed, independent of worker-driven checkpoints.
+BACKGROUND_HEARTBEAT_INTERVAL_SECONDS = _int(
+    "TDB_JOB_BACKGROUND_HEARTBEAT_INTERVAL_SECONDS",
+    max(5, STALE_THRESHOLD_SECONDS // 6),
+)
+
 
 # ------------------------------------------------------------------ retention
 # How long terminal jobs are kept before the daily purge removes them (and any
