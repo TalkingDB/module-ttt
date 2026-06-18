@@ -61,3 +61,9 @@ DAEMON_INTERVAL_SECONDS = _int("TDB_JOB_DAEMON_INTERVAL_SECONDS", 60)
 # Applied as `PRAGMA busy_timeout` so concurrent writers wait instead of
 # failing immediately with SQLITE_BUSY.
 SQLITE_BUSY_TIMEOUT_MS = _int("TDB_SQLITE_BUSY_TIMEOUT_MS", 5000)
+
+
+# ------------------------------------------------------------------- documents
+# Maximum number of curated suggested queries accepted per document at ingest
+# time. Curated demo documents carry a small, fixed set of examples.
+MAX_SUGGESTED_QUERIES = _int("TDB_MAX_SUGGESTED_QUERIES", 5)

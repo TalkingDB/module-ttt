@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api import root, index, documents, jobs, queries
+from app.api import root, index, documents, jobs, queries, namespaces, public
 from app.services import job_daemon
 from app.services.workers import init_database
 
@@ -27,6 +27,8 @@ app.add_middleware(
 
 app.include_router(root.router)
 app.include_router(documents.router)
+app.include_router(namespaces.router)
 app.include_router(jobs.router)
 app.include_router(queries.router)
 app.include_router(index.router)
+app.include_router(public.router)

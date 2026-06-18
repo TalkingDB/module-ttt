@@ -28,6 +28,11 @@ from talkingdb.models.job.job import JobModel
 from talkingdb.models.job.type import JobType
 from talkingdb.models.metadata.metadata import DEFAULT_METADATA
 
+from app.api.validators import (
+    clean_optional_text,
+    parse_suggested_queries,
+    validate_namespace,
+)
 from app.core import config as job_config
 from app.model.jobs import JobAcceptedResponse, JobStatusResponse
 from app.services import jobs
@@ -61,10 +66,34 @@ async def submit_document_job(
     session_id: Optional[str] = Form(
         None, description="Session to group this document with others"
     ),
+    namespace: Optional[str] = Form(
+        None,
+        description=(
+            "Curated library namespace (e.g. 'demo-library'). Omit for ordinary "
+            "user uploads. Must already exist when provided."
+        ),
+    ),
+    title: Optional[str] = Form(
+        None, description="Curated document title; defaults to the filename"
+    ),
+    description: Optional[str] = Form(
+        None, description="Short curated description shown in demo listings"
+    ),
+    suggested_queries: Optional[List[str]] = Form(
+        None,
+        description=(
+            "Curated example queries for this document; add up to 5."
+        ),
+    ),
     api_key: str = Depends(verify_api_key),
 ) -> JobAcceptedResponse:
     """Submit a document ingestion job for background processing."""
     ext = validate_file_type(file)
+
+    namespace = validate_namespace(namespace)
+    parsed_queries = parse_suggested_queries(suggested_queries)
+    title = clean_optional_text(title)
+    description = clean_optional_text(description)
 
     spool.assert_spool_capacity()
 
@@ -97,6 +126,10 @@ async def submit_document_job(
             job_type=JobType.DOCUMENT,
             filename=file.filename,
             session_id=session_id,
+            namespace=namespace,
+            title=title,
+            description=description,
+            suggested_queries=parsed_queries,
         )
         job.file_size_bytes = size_bytes
         job.temp_path = temp_path
