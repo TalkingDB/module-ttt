@@ -1,21 +1,5 @@
-"""Per-job runtime context: checkpoints, heartbeats, cancel + timeout signals.
-
-The worker passes a :class:`JobContext` down into the pipeline (parse / index /
-persist). Long-running steps call ``ctx.checkpoint(...)`` between units of
-work. Each call does three things:
-
-  1. Reads the ``cancel_requested`` flag - raises :class:`JobCancelled` if set.
-  2. Checks elapsed wall-clock - raises :class:`JobTimeout` past
-     ``MAX_JOB_DURATION_SECONDS``.
-  3. Writes a best-effort progress + heartbeat row (rate-limited to
-     ``HEARTBEAT_MIN_GAP_SECONDS`` so we don't hammer SQLite).
-
-Progress writes are deliberately best-effort: a dropped checkpoint due to
-write contention or a guarded UPDATE (state already terminal) never affects
-correctness; it just means the reported percent may briefly lag actual work.
-"""
-
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
@@ -48,11 +32,46 @@ class JobContext:
     started_monotonic: float = field(default_factory=time.monotonic)
     _last_heartbeat_monotonic: float = field(default=0.0)
     _stage: Optional[JobStage] = None
+    _hb_stop: threading.Event = field(
+        default_factory=threading.Event, repr=False
+    )
+    _hb_thread: Optional[threading.Thread] = field(default=None, repr=False)
 
     # ----------------------------------------------------------- utilities
     def elapsed_seconds(self) -> float:
         """Return elapsed runtime in seconds."""
         return time.monotonic() - self.started_monotonic
+
+    # ------------------------------------------------- background heartbeat
+    def start_background_heartbeat(self) -> None:
+        if self._hb_thread is not None:
+            return
+        self._hb_stop.clear()
+        self._hb_thread = threading.Thread(
+            target=self._heartbeat_loop,
+            name=f"tdb-job-hb-{self.job_id}",
+            daemon=True,
+        )
+        self._hb_thread.start()
+
+    def stop_background_heartbeat(self) -> None:
+        """Stop the heartbeat timer. Idempotent; safe to call from a finally."""
+        self._hb_stop.set()
+        thread = self._hb_thread
+        if thread is not None:
+            thread.join(timeout=5)
+            self._hb_thread = None
+
+    def _heartbeat_loop(self) -> None:
+        interval = config.BACKGROUND_HEARTBEAT_INTERVAL_SECONDS
+        while not self._hb_stop.wait(interval):
+            try:
+                self._best_effort_progress(stage=self._stage, heartbeat=True)
+                self._last_heartbeat_monotonic = time.monotonic()
+            except Exception:
+                logger.exception(
+                    f"[job {self.job_id}] background heartbeat tick failed"
+                )
 
     def _should_write_heartbeat(self, *, force: bool) -> bool:
         """Return whether a heartbeat should be written."""
