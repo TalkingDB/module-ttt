@@ -5,11 +5,30 @@ MODE ?= $(DEFAULT_MODE)
 
 .DEFAULT_GOAL := help
 
+# Detect if Infisical is initialized
+INFISICAL_PRESENT := $(shell test -f .infisical.json && echo "true" || echo "false")
+
+COMMON_CMD = poetry run python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --loop uvloop --http httptools
+
+LOCAL_CMD = poetry run python -m debugpy --listen 0.0.0.0:5690 -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --loop uvloop --http httptools
+
 local:
-	infisical run --watch -- poetry run python -m debugpy --listen 0.0.0.0:5690 -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --loop uvloop --http httptools --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer
+	@if [ "$(INFISICAL_PRESENT)" = "true" ]; then \
+		echo "Running with Infisical..."; \
+		infisical run --watch -- $(LOCAL_CMD) --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer; \
+	else \
+		echo "Running with .env file"; \
+		$(LOCAL_CMD) --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer; \
+	fi
 
 run:
-	infisical run -- poetry run python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --workers 4 --loop uvloop --http httptools
+	@if [ "$(INFISICAL_PRESENT)" = "true" ]; then \
+		echo "Running with Infisical..."; \
+		infisical run -- $(COMMON_CMD) --workers 4; \
+	else \
+		echo "Running with .env file"; \
+		$(COMMON_CMD) --workers 4; \
+	fi
 
 sync:
 	@echo "🔄 Running sync_git_deps.py with mode: $(MODE)"
