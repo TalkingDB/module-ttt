@@ -10,13 +10,15 @@ INFISICAL_PRESENT := $(shell test -f .infisical.json && echo "true" || echo "fal
 
 COMMON_CMD = poetry run python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --loop uvloop --http httptools
 
+LOCAL_CMD = poetry run python -m debugpy --listen 0.0.0.0:5690 -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --loop uvloop --http httptools
+
 local:
 	@if [ "$(INFISICAL_PRESENT)" = "true" ]; then \
 		echo "Running with Infisical..."; \
-		infisical run --watch -- $(COMMON_CMD) --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer; \
+		infisical run --watch -- $(LOCAL_CMD) --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer; \
 	else \
 		echo "Running with .env file"; \
-		$(COMMON_CMD) --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer; \
+		$(LOCAL_CMD) --reload --reload-dir ./ --reload-dir ../base-tdb-models --reload-dir ../base-tdb-clients --reload-dir ../base-tdb-helpers --reload-dir ../package-content-elementizer; \
 	fi
 
 run:
