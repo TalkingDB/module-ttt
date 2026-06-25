@@ -15,6 +15,9 @@ class JobAcceptedResponse(BaseModel):
 
     job_id: str = Field(..., description="Stable job id")
     job_type: str = Field(..., description="Kind of background operation (e.g. 'document')")
+    session_id: Optional[str] = Field(
+        None, description="Session this document is linked to"
+    )
     state: str = Field(..., description="Current job state")
 
 
@@ -25,6 +28,9 @@ class JobStatusResponse(BaseModel):
     job_type: str = Field(
         ...,
         description="Kind of background operation (e.g. 'document')",
+    )
+    session_id: Optional[str] = Field(
+        None, description="Session this document is linked to"
     )
     state: str = Field(
         ...,
