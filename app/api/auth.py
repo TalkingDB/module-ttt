@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Depends, status
 from talkingdb.clients.sqlite import sqlite_conn
 from talkingdb.helpers.auth import hash_password, verify_password
-from talkingdb.helpers.jwt import create_access_token
+from talkingdb.helpers.jwt import create_access_token, get_current_user
 from talkingdb.models.auth.auth import SignupRequest, SignupResponse, LoginRequest, LoginResponse
+from talkingdb.models.auth.api_key import APIKeyModel
 from talkingdb.models.auth.user import UserModel
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -68,3 +69,18 @@ async def login(payload: LoginRequest):
         access_token= token,
         message= "Successfully logined"
     )
+
+
+@router.post("/api-keys")
+def create_api_key(user_email: str = Depends(get_current_user)):
+
+    with sqlite_conn() as conn:
+        api_key_obj = APIKeyModel.create(
+            conn=conn,
+            user_email=user_email,
+        )
+
+    return {
+        "api_key": api_key_obj.api_key,
+        "created_at": api_key_obj.created_at,
+    }
