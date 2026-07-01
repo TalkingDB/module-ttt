@@ -67,7 +67,7 @@ async def login(payload: LoginRequest):
 
     return LoginResponse(
         access_token= token,
-        message= "Successfully logined"
+        message= "Successfully logged in"
     )
 
 
