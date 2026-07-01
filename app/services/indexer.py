@@ -1,5 +1,4 @@
 import time
-import os
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -24,6 +23,7 @@ from app.services.package_text_tokenizer import TextTokenizer
 from app.services.package_symbol_generator import SymbolGenerator
 from talkingdb.clients.sqlite import sqlite_conn
 from talkingdb.logger.console import logger
+from app.core import config
 
 
 class IndexerService:
@@ -31,7 +31,9 @@ class IndexerService:
         self.gm = GraphModel.create(GraphModel.make_id(uuid4().hex), True)
         self.tokenizer = TextTokenizer()
         self.symbol_generator = SymbolGenerator()
-        self.max_workers = max_workers or (os.cpu_count() * 2)
+        self.max_workers = (
+            max_workers if max_workers is not None else config.INDEXER_MAX_WORKERS
+        )
 
     def graph_file_index(self, file_index: FileIndexModel) -> GraphModel:
         def walk(node: IndexItem, parent_id: str = None):

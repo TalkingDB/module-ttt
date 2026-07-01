@@ -21,6 +21,15 @@ MAX_WORKERS = _int("TDB_JOB_MAX_WORKERS", min(4, os.cpu_count() or 1))
 # Max queued jobs before returning HTTP 429.
 QUEUE_CAPACITY = _int("TDB_JOB_QUEUE_CAPACITY", 2 * MAX_WORKERS)
 
+# Element-level indexing fan-out per document. Sized so that MAX_WORKERS
+# documents indexing concurrently share ~(2 * cpu) threads in total, instead of
+# each document spawning its own (2 * cpu) pool (which multiplied to
+# MAX_WORKERS * 2 * cpu threads under load). Override with TDB_INDEXER_MAX_WORKERS.
+INDEXER_MAX_WORKERS = _int(
+    "TDB_INDEXER_MAX_WORKERS",
+    max(2, (2 * (os.cpu_count() or 1)) // MAX_WORKERS),
+)
+
 # Suggested client retry delay.
 RETRY_AFTER_SECONDS = _int("TDB_JOB_RETRY_AFTER_SECONDS", 30)
 
