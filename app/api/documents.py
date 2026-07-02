@@ -18,6 +18,7 @@ from talkingdb.helpers.auth import verify_api_key
 from talkingdb.helpers.graph import store as graph_store
 from talkingdb.helpers.graph_cache import graph_cache
 from talkingdb.helpers.job import store as job_store
+from talkingdb.helpers.session import store as session_store
 from talkingdb.helpers.validation import (
     validate_file_type,
     max_file_size_bytes_for,
@@ -135,6 +136,8 @@ async def submit_document_job(
         job.temp_path = temp_path
 
         with sqlite_conn() as conn:
+            if session_id:
+                session_store.ensure_session(conn, session_id, api_key)
             job_store.insert(conn, job)
 
         jobs.enqueue_reserved(
