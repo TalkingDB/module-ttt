@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-jobs: s
+jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
