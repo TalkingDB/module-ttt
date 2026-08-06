@@ -46,4 +46,6 @@ logs
 .last_build_commit
 
 # Database
-graphs.db*
+graphs.db*coverage.xml
+junit.xml
+.coverage
