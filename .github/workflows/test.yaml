@@ -5,11 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-
+  workflow_dispatch:
 permissions:
   contents: read
 
-jobs:
+jobs: s
   coverage:
     runs-on: ubuntu-latest
     steps:
