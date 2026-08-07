@@ -12,14 +12,13 @@
 <p align="center">
   <img src="https://img.shields.io/github/last-commit/TalkingDB/module-ttt?style=flat-square&label=last%20commit&color=4c1" />
   <img src="https://img.shields.io/github/contributors/TalkingDB/module-ttt?style=flat-square&label=contributors&color=e05d44" />
+  <img src="https://img.shields.io/codecov/c/github/Harshitraiii2005/module-ttt?style=flat-square&label=coverage&color=4c1" />
   <img src="https://img.shields.io/badge/language-Python-3776AB?style=flat-square&logo=python&logoColor=white" />
   <img src="https://img.shields.io/github/license/TalkingDB/module-ttt?style=flat-square&label=License&color=4c1" />
   <img src="https://img.shields.io/badge/release-v2.5.3-4c1?style=flat-square" />
     <img src="https://img.shields.io/badge/OS-linux%2C%20windows%2C%20macOS-2496ED?style=flat-square" />
   <img src="https://img.shields.io/badge/free%20for%20non--commercial%20use-4c1?style=flat-square" />
-
 </p>
-
 ---
 <h3 align="center">Vectorless, Search & Retrieval - at 1/10th token consumption</h3>
 
