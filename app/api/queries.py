@@ -1,6 +1,7 @@
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 
 from talkingdb.helpers.auth import verify_api_key
 from talkingdb.models.api.response import ErrorResponse
@@ -12,6 +13,18 @@ from app.services.summarizer import summarize_elements
 
 
 router = APIRouter(prefix="/v1", tags=["Queries"])
+
+
+def _run_extraction(graph_ids, max_results, text):
+    """Build the extractor and run the match/rank pipeline.
+
+    Both steps are synchronous: the constructor loads graphs from SQLite on
+    a cache miss, and ``extract()`` blocks on ``Future.result()`` while its
+    own worker threads rank matches. Run via ``run_in_threadpool`` so this
+    never ties up the event loop for the rest of the pipeline's duration.
+    """
+    extractor = ExtractorService(graph_ids=graph_ids, max_matches=max_results)
+    return extractor.extract(query=text)
 
 
 @router.post(
@@ -38,11 +51,9 @@ async def query_documents(
     start = time.time()
 
     try:
-        extractor = ExtractorService(
-            graph_ids=request.graph_ids,
-            max_matches=request.max_results,
+        result = await run_in_threadpool(
+            _run_extraction, request.graph_ids, request.max_results, request.text
         )
-        result = extractor.extract(query=request.text)
     except KeyError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -74,7 +85,9 @@ async def query_documents(
     summary = None
     if request.summarize:
         try:
-            summary = summarize_elements(query=request.text, elements=elements)
+            summary = await run_in_threadpool(
+                summarize_elements, query=request.text, elements=elements
+            )
         except Exception as e:
             # Don't fail the whole query just because summarization failed -
             # the caller still gets their matched elements back.
