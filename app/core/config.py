@@ -41,7 +41,7 @@ MAX_WORKERS = _int("TDB_JOB_MAX_WORKERS", os.cpu_count() or 4)
 # degrades latency for everyone instead (confirmed under TAL-1449 load
 # testing - a QUEUE_CAPACITY of 500 traded 77% upload failures for a 4x
 # regression in concurrent query p95).
-QUEUE_CAPACITY = _int("TDB_JOB_QUEUE_CAPACITY", max(4 * MAX_WORKERS, 20))
+QUEUE_CAPACITY = max(_int("TDB_JOB_QUEUE_CAPACITY", 4 * MAX_WORKERS), 150)
 
 # Element-level indexing fan-out per document. Sized so that MAX_WORKERS
 # documents indexing concurrently share ~(2 * cpu) threads in total, instead of
