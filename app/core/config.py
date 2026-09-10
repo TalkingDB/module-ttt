@@ -25,11 +25,23 @@ def _float(name: str, default: float) -> float:
 
 
 # --------------------------------------------------------------- concurrency
-# Small bounded worker pool for CPU-heavy ingestion.
-MAX_WORKERS = _int("TDB_JOB_MAX_WORKERS", min(4, os.cpu_count() or 1))
+# Worker pool for CPU-heavy ingestion (parsing + indexing). Sized to the
+# host's actual core count rather than an artificial ceiling, so admitted
+# jobs get real parallelism instead of piling up inside the executor's
+# internal queue.
+MAX_WORKERS = _int("TDB_JOB_MAX_WORKERS", os.cpu_count() or 4)
 
-# Max queued jobs before returning HTTP 429.
-QUEUE_CAPACITY = _int("TDB_JOB_QUEUE_CAPACITY", 2 * MAX_WORKERS)
+# Max jobs admitted (queued + actively processing) before returning HTTP 429.
+# A slot is held for a job's full parse+index duration, not just the request
+# (see jobs.enqueue_reserved/_run_after_reservation), so this must clear
+# MAX_WORKERS by a comfortable margin - otherwise legitimate concurrent
+# uploads get rejected before a worker thread ever frees up. It's a floor
+# against premature 429s, not "as large as possible": an unbounded queue
+# just replaces a fast, clear rejection with an invisible backlog that
+# degrades latency for everyone instead (confirmed under TAL-1449 load
+# testing - a QUEUE_CAPACITY of 500 traded 77% upload failures for a 4x
+# regression in concurrent query p95).
+QUEUE_CAPACITY = _int("TDB_JOB_QUEUE_CAPACITY", max(4 * MAX_WORKERS, 20))
 
 # Element-level indexing fan-out per document. Sized so that MAX_WORKERS
 # documents indexing concurrently share ~(2 * cpu) threads in total, instead of
