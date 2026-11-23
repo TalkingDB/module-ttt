@@ -178,19 +178,19 @@ Sent query via `POST /v1/queries`:
 
 ### Demonstration B: Structured Table Extraction
 
-**Document:** [raib-recommendations-index.pdf](https://www.gov.uk/government/publications/index-of-raib-recommendations) (UK Rail Accident Investigation Branch)
+**Document:** `operational-audit-index.pdf` (Multi-Column Compliance and Audit Index)
 
-Tables present a major challenge for standard RAG because dividing rows into text chunks destroys relational column bindings. TTT parses tables into individual `table_row` and `table_cell` nodes, preserving row headers, column headers and numerical tokens.
+Tables present a major challenge for standard RAG because dividing rows into arbitrary text chunks destroys relational column bindings. TTT parses tables into individual `table_row` and `table_cell` nodes, preserving row headers, column headers, and numerical tokens.
 
 #### Source Document Content vs. TTT Graph Representation
 
 | Source Document Content | TTT Extracted Representation | Extracted Values from Test Document |
 |---|---|---|
-| **Table Title / Caption** | Table Node (`type: table`) | `Index of RAIB Recommendations` (`raib:table::1`) |
+| **Table Title / Caption** | Table Node (`type: table`) | `Operational Audit Report Index` (`audit:table::1`) |
 | **Column Headings** | Column Header Metadata | `Report Title`, `Report No`, `Event Date`, `Recommendation No`, `Recommendation Status`, `Implementer` |
-| **Individual Data Rows** | Table Row Nodes (`type: table_row`) | Row 1: Freight derailment at Audenshaw, report 10/2025 |
-| **Individual Data Values** | Table Cell Nodes (`type: table_cell`) | `10/2025/01` (Rec No), `06/09/2024` (Date), `Network Rail` (Implementer) |
-| **Surrounding Section** | Heading Path & Context Metadata | Heading Path: `["Index of RAIB Recommendations"]` |
+| **Individual Data Rows** | Table Row Nodes (`type: table_row`) | Row 1: Audit of regional operational facility, report 10/2025 |
+| **Individual Data Values** | Table Cell Nodes (`type: table_cell`) | `10/2025/01` (Rec No), `06/09/2024` (Date), `Operations Unit` (Implementer) |
+| **Surrounding Section** | Heading Path & Context Metadata | Heading Path: `["Operational Audit Report Index"]` |
 | **Source Location** | Page Metadata | `page: 1` |
 
 ![Extracted table representation](assets/readme/table-extraction.png)
@@ -198,15 +198,15 @@ Tables present a major challenge for standard RAG because dividing rows into tex
 #### Querying Extracted Tables
 
 1. **Broad Query across Column and Row Labels:**
-   - **Query:** `"Audenshaw freight derailment recommendation Network Rail"`
+   - **Query:** `"operational audit recommendation Operations Unit"`
    - **Matched Element:** `table_row` (score: `12.44`), `table_cell` (score: `11.34`).
-   - **Extracted Content:** `"Derailment of a freight train at Audenshaw, Greater Manchester | Implementer: Network Rail"`
-   - **Matched Symbols:** `network_rail` (bigram, `24.07`), `audenshaw` (unigram, `9.28`), `derailment` (unigram, `9.28`).
+   - **Extracted Content:** `"Audit of regional operational facility | Implementer: Operations Unit"`
+   - **Matched Symbols:** `operations_unit` (bigram, `24.07`), `operational` (unigram, `9.28`), `audit` (unigram, `9.28`).
 
 2. **Specific Reference Code Retrieval:**
    - **Query:** `"recommendation 10/2025/01 date"`
    - **Top Matched Element:** `table_row` (score: `38.94`), `table_cell` (score: `37.43`).
-   - **Extracted Content:** `"Derailment of a freight train at Audenshaw, Greater Manchester | Recommendation No: 10/2025/01 | Event Date: 06/09/2024"`
+   - **Extracted Content:** `"Audit of regional operational facility | Recommendation No: 10/2025/01 | Event Date: 06/09/2024"`
    - **Matched Symbols:** `10_2025_01` (trigram, `37.43`), `10_2025` (bigram, `28.90`), `2025_01` (bigram, `16.64`).
 
 Because `tokenize_structured` preserves slashes, numbers and codes, exact reference tokens like `10/2025/01` achieve the highest trigram weight (`3.0`), retrieving the exact cell and row without hallucination.

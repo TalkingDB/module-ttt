@@ -48,6 +48,7 @@ logs
 # Database
 graphs.db*
 data/
+scratch/
 
 # Coverage / CI report artifacts
 coverage.xml
