@@ -14,38 +14,22 @@ TTT is a **document processing and retrieval service**. It is not a general purp
 
 A [graph](https://networkx.org/documentation/stable/tutorial.html) is made of **nodes** (the items) and **edges** (the connections between items). In TTT, nodes can represent headings, paragraphs, tables, table rows, table cells and searchable symbols.
 
-## Key terms in plain English
-
-| Term | Simple meaning | Learn more |
-|---|---|---|
-| Noun phrase | A group of words built around a noun, such as `network access policy` | [Cambridge explanation](https://dictionary.cambridge.org/grammar/british-grammar/noun-phrases) |
-| Token and tokenization | A token is a piece of text. Tokenization splits text into those pieces, usually words in TTT | [spaCy explanation](https://spacy.io/usage/linguistic-features#tokenization) |
-| Lemma and lemmatization | The base form of a word and the process of converting a word to that form | [spaCy explanation](https://spacy.io/usage/linguistic-features#lemmatization) |
-| Stop word | A common word, such as `the` or `is`, that may be skipped when searching ordinary text | [spaCy language data](https://spacy.io/usage/linguistic-features#language-data) |
-| N-gram | A sequence of nearby words. A unigram has one word, a bigram has two and a trigram has three | [Google explanation](https://developers.google.com/machine-learning/glossary#n-gram) |
-| Symbolic index | TTT's searchable word groups linked to the document elements where they occur | [TTT symbol generator](https://github.com/TalkingDB/module-ttt/blob/main/app/services/package_symbol_generator.py) |
-| IDF | A weighting idea that gives more importance to terms found in fewer document elements | [Simple IDF background](https://scikit-learn.org/stable/modules/feature_extraction.html#tfidf-term-weighting) |
-| API endpoint | A URL an application calls to use a service | [FastAPI first steps](https://fastapi.tiangolo.com/tutorial/first-steps/) |
-| Bearer token | A credential sent in the HTTP `Authorization` header | [FastAPI explanation](https://fastapi.tiangolo.com/tutorial/security/first-steps/) |
-| Docker volume | Storage that remains available when a container is removed or replaced | [Docker explanation](https://docs.docker.com/engine/storage/volumes/) |
-| LLM | A model that can understand and generate text | [IBM introduction](https://www.ibm.com/think/topics/large-language-models) |
-
 ## How symbolic indexing works
 
 The indexed terms can look like [noun phrases](https://dictionary.cambridge.org/grammar/british-grammar/noun-phrases), such as `network access policy` or `customer account balance`. However, TTT does not run a grammatical noun phrase extractor. Instead, it creates searchable word groups from nearby words. This is called **n-gram indexing**. The steps are:
 
 1. **Tokenization:** split text into smaller pieces called [tokens](https://developers.google.com/machine-learning/glossary#token). For this service, tokens are usually words. See [how spaCy tokenizes text](https://spacy.io/usage/linguistic-features#tokenization).
-2. **Lemmatization:** convert words to their base form. For example, `connections` becomes `connection`. See [spaCy's explanation](https://spacy.io/usage/linguistic-features#lemmatization).
-3. **Stop word filtering:** remove some very common words from ordinary prose, such as `the` and `is`. See [spaCy's explanation of stop words](https://spacy.io/usage/linguistic-features#language-data).
-4. **N-gram generation:** create groups of one, two and three adjacent words. Read [Google's simple n-gram explanation](https://developers.google.com/machine-learning/glossary#n-gram).
+2. **Lemmatization:** convert words to their base form. For example, `connections` becomes `connection`. See [spaCy&#39;s explanation](https://spacy.io/usage/linguistic-features#lemmatization).
+3. **Stop word filtering:** remove some very common words from ordinary prose, such as `the` and `is`. See [spaCy&#39;s explanation of stop words](https://spacy.io/usage/linguistic-features#language-data).
+4. **N-gram generation:** create groups of one, two and three adjacent words. Read [Google&#39;s simple n-gram explanation](https://developers.google.com/machine-learning/glossary#n-gram).
 
 For `network access policy`, TTT creates these symbols:
 
-| Symbol type | Meaning | Example |
-|---|---|---|
-| [Unigram](https://developers.google.com/machine-learning/glossary#n-gram) | One word | `network`, `access`, `policy` |
-| [Bigram](https://developers.google.com/machine-learning/glossary#bigram) | Two adjacent words | `network_access`, `access_policy` |
-| [Trigram](https://developers.google.com/machine-learning/glossary#trigram) | Three adjacent words | `network_access_policy` |
+| Symbol type                                                                | Meaning              | Example                           |
+| -------------------------------------------------------------------------- | -------------------- | --------------------------------- |
+| [Unigram](https://developers.google.com/machine-learning/glossary#n-gram)  | One word             | `network`, `access`, `policy`     |
+| [Bigram](https://developers.google.com/machine-learning/glossary#bigram)   | Two adjacent words   | `network_access`, `access_policy` |
+| [Trigram](https://developers.google.com/machine-learning/glossary#trigram) | Three adjacent words | `network_access_policy`           |
 
 A **symbolic index** is the set of generated symbols connected to the paragraph, table, row or cell where they occur. When a query arrives, TTT generates symbols from the query too, finds matching document elements and ranks the results. The rank uses an [inverse document frequency (IDF) style weight](https://scikit-learn.org/stable/modules/feature_extraction.html#tfidf-term-weighting): symbols that occur in fewer document elements receive more weight. This is an IDF based weighting step, not a full TF-IDF vectorization pipeline. TTT's exact scoring implementation is in the [extractor](https://github.com/TalkingDB/module-ttt/blob/main/app/services/extractor.py).
 
@@ -120,25 +104,25 @@ Open `http://localhost:8090/index/html?graph_id=YOUR_GRAPH_ID` to view the index
 
 ## Main API endpoints
 
-| Endpoint | Purpose |
-|---|---|
-| `POST /v1/documents` | Upload a PDF or DOCX for processing |
-| `GET /v1/jobs/{job_id}` | Check processing status and get the graph ID |
-| `POST /v1/queries` | Retrieve matching paragraphs and table content |
-| `GET /v1/tree/json?graph_id={graph_id}` | Return the graph as JSON |
-| `GET /index/html?graph_id={graph_id}` | View the graph |
-| `GET /health` | Check service health |
+| Endpoint                                | Purpose                                        |
+| --------------------------------------- | ---------------------------------------------- |
+| `POST /v1/documents`                    | Upload a PDF or DOCX for processing            |
+| `GET /v1/jobs/{job_id}`                 | Check processing status and get the graph ID   |
+| `POST /v1/queries`                      | Retrieve matching paragraphs and table content |
+| `GET /v1/tree/json?graph_id={graph_id}` | Return the graph as JSON                       |
+| `GET /index/html?graph_id={graph_id}`   | View the graph                                 |
+| `GET /health`                           | Check service health                           |
 
-An **API endpoint** is a URL where an application can call a service. See [FastAPI's first steps guide](https://fastapi.tiangolo.com/tutorial/first-steps/).
+An **API endpoint** is a URL where an application can call a service. See [FastAPI&#39;s first steps guide](https://fastapi.tiangolo.com/tutorial/first-steps/).
 
 ## Documentation and help
 
-| Guide | Link |
-|---|---|
-| Quickstart | [TTT Quickstart](https://docs.talkingdb.io/doc/quickstart-EHLtsm5kYD) |
-| API reference | [Interactive API documentation](https://ttt-rc4.talkingdb.io/docs) |
-| Installation | [Deployment and installation guide](https://docs.talkingdb.io/doc/installation-hub-oWdyL8X4L3) |
-| Troubleshooting | [TTT Troubleshooting](TROUBLESHOOTING.md) |
+| Guide           | Link                                                                                           |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Quickstart      | [TTT Quickstart](https://docs.talkingdb.io/doc/quickstart-EHLtsm5kYD)                          |
+| API reference   | [Interactive API documentation](https://ttt-rc4.talkingdb.io/docs)                             |
+| Installation    | [Deployment and installation guide](https://docs.talkingdb.io/doc/installation-hub-oWdyL8X4L3) |
+| Troubleshooting | [TTT Troubleshooting](TROUBLESHOOTING.md)                                                      |
 
 ## Related components
 
