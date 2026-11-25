@@ -1,0 +1,40 @@
+{
+  "collection_name": "Fulfillment Knowledge Base",
+  "description": "Static document collection manifest for Fulfillment Chat. Maps domain policy documents to pre-indexed TTT graph IDs.",
+  "version": "1.0.0",
+  "documents": [
+    {
+      "name": "Fulfillment & Dispatch Policy",
+      "filename": "fulfillment-policy.pdf",
+      "graph_id": "graph::e1b4a7d290c8413f9a7218d6e35c8b01",
+      "indexed_at": "2026-11-20T10:15:30Z",
+      "page_count": 8,
+      "element_count": 42
+    },
+    {
+      "name": "Customer Returns & Refund Terms",
+      "filename": "returns-policy.pdf",
+      "graph_id": "graph::b49c017d83fa461298e1f0a25698dd34",
+      "indexed_at": "2026-11-20T10:18:12Z",
+      "page_count": 5,
+      "element_count": 28
+    },
+    {
+      "name": "Carrier Service Level Agreement",
+      "filename": "carrier-sla-2026.docx",
+      "graph_id": "graph::f730ab2c418e4785b924dc810e7539a9",
+      "indexed_at": "2026-11-21T14:02:45Z",
+      "page_count": 14,
+      "element_count": 86
+    }
+  ],
+  "query_template": {
+    "graph_ids": [
+      "graph::e1b4a7d290c8413f9a7218d6e35c8b01",
+      "graph::b49c017d83fa461298e1f0a25698dd34",
+      "graph::f730ab2c418e4785b924dc810e7539a9"
+    ],
+    "max_results": 10,
+    "summarize": false
+  }
+}
