@@ -1,0 +1,10 @@
+flowchart LR
+    accTitle: How TTT turns a document into answers
+    accDescr: A PDF or DOCX is read into elements by the content elementizer, arranged into a tree of sections, indexed by word symbols, and stored as a graph. A question is turned into the same symbols, matched against the graph, and answered with ranked passages that carry their page and heading path.
+    DOC["PDF or DOCX"] --> CE["Read elements<br>(content elementizer)"]
+    CE --> TREE["Tree of sections,<br>paragraphs, tables"]
+    TREE --> IDX["Index by word symbols<br>(1, 2 and 3 word phrases)"]
+    IDX --> G[("Document graph<br>SQLite")]
+    Q["Question"] --> M["Match the same symbols"]
+    G --> M
+    M --> R["Ranked passages<br>+ page + heading path"]

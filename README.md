@@ -3,119 +3,97 @@
 </p>
 
 # Text-to-Tree (TTT)
-> Turn PDF & DOCX documents into structured, searchable knowledge graphs.
 
-TTT is a TalkingDB document ingestion and retrieval service that transforms PDF and DOCX files into deterministic, queryable graphs. Rather than slicing documents into arbitrary token chunks with opaque vector embeddings, TTT preserves document sections, headings, paragraphs, and multi-column tables as interconnected graph elements indexed by normalized symbols.
+TTT turns a PDF or Word file into a **tree** of its own sections, paragraphs and table cells, indexes that tree by its words, and answers a question with the exact passages that match, each with its page and heading path. No [embeddings](https://en.wikipedia.org/wiki/Word_embedding), no guessing: every result can be traced back to the place in the document it came from.
 
-TTT is a **document processing and retrieval service**. It is designed for applications (such as conversational agents and enterprise search) that require grounded evidence with full provenance, exact table cell queries, and zero vector hallucination.
+| Start here | Go deeper |
+| :--- | :--- |
+| [How it works](#how-it-works) | [Concepts: tree, symbols, scoring, in plain words](docs/concepts.md) |
+| [Run it in four steps](#run-it-in-four-steps) | [Every endpoint](docs/api-reference.md) |
+| [What TTT is not](#what-ttt-is-not) | [All documentation](docs/README.md) |
+| [Live API docs](https://ttt-rc4.talkingdb.io/docs) | [Troubleshooting](docs/troubleshooting.md) |
 
-[Interactive API Docs](https://ttt-rc4.talkingdb.io/docs) · [Quickstart Guide](https://docs.talkingdb.io/doc/quickstart-EHLtsm5kYD) · [Troubleshooting Guide](TROUBLESHOOTING.md)
+## How it works
 
----
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/how-ttt-turns-a-document-into-answers-dark.svg">
+  <img alt="A PDF or DOCX is read into elements by the content elementizer, arranged into a tree of sections, indexed by word symbols, and stored as a graph. A question is turned into the same symbols, matched against the graph, and answered with ranked passages that carry their page and heading path." src="docs/images/how-ttt-turns-a-document-into-answers.svg">
+</picture>
 
-## Architecture Overview
+<sub>Diagram source: [how-ttt-turns-a-document-into-answers.mmd](docs/diagrams/how-ttt-turns-a-document-into-answers.mmd). Edit it and re-render with the steps in [docs/diagrams](docs/diagrams/README.md).</sub>
 
-```mermaid
-flowchart LR
-    A["Source Documents<br>(PDF / DOCX)"] --> B["Content Elementizer<br>(Layout & Hierarchy)"]
-    B --> C["Tree of Sections<br>(H1 to H6 Outlines)"]
-    B --> D["Document Elements<br>(Paragraphs & Tables)"]
-    C --> E["Directed Graph<br>(NetworkX)"]
-    D --> E
-    E --> F["Symbolic Indexing<br>(Lemmatized N-Grams)"]
-    F --> G[("SQLite Graph Store<br>(data/graphs.db)")]
-    G --> H["Deterministic Search<br>(POST /v1/queries)"]
-    H --> I["Ranked Evidence<br>+ Provenance"]
-```
+In words: TTT keeps the document's own structure, indexes it by the words and phrases it contains, and answers by matching the question's words against that index, so each answer points to a real place in the file. The ideas behind each step are explained in [docs/concepts.md](docs/concepts.md).
 
----
+## Run it in four steps
 
-## Core Capabilities
+**1. Start the service** ([Docker](https://docs.docker.com/get-started/docker-overview/); data survives restarts in the `ttt-data` volume):
 
-- **Structural Parsing:** Uses `package-content-elementizer` to extract headings, paragraphs, and physical coordinates (page numbers, bounding boxes, reading order).
-- **Document Hierarchy:** Builds an outline tree (`FileIndexModel`) linking sections (H1–H6) to their child paragraphs and tables via directed `part_of` edges.
-- **Relational Table Decomposition:** Parses tables into discrete `table_row` and `table_cell` nodes, preserving column headers and numerical reference codes (`10/2025/01`).
-- **Symbolic Graph Indexing:** Extracts lemmatized unigrams, bigrams, and trigrams with spaCy, connecting symbols to elements with `contains` (weight `1.0`) and `context` (weight `0.4`) edges.
-- **Auditable Relevance Scoring:** Matches terms deterministically using weighted n-grams and inverse document frequency (IDF) without vector similarity drift.
-- **One-Time Ingestion:** Index once into stable graph IDs; query across multiple document graphs in a single request.
-
----
-
-## Quickstart
-
-### 1. Start Service with Docker
 ```bash
-docker pull talkingdb/ttt
 docker run -d --name talkingdb-ttt -p 8090:8090 -v ttt-data:/app/data talkingdb/ttt
 ```
-*Verify health at `http://localhost:8090/health` or view OpenAPI docs at `http://localhost:8090/docs`.*
 
-### 2. Upload a Document
-```bash
-curl -X POST "http://localhost:8090/v1/documents" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -F "file=@sample-document.pdf"
-```
-*Returns `202 Accepted` with a `job_id`.*
+Check `http://localhost:8090/health`, or open the API page at `http://localhost:8090/docs`. To get an API key, sign up and log in, then `POST /auth/api-keys` ([how](docs/api-reference.md#get-an-api-key)).
 
-### 3. Poll Ingestion Status
-```bash
-curl -X GET "http://localhost:8090/v1/jobs/YOUR_JOB_ID" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-*Wait until `state` is `COMPLETED`, then copy the `result_graph_id`.*
+**2. Upload a document.** You get a `job_id` back at once (`202 Accepted`).
 
-### 4. Query the Document Graph
 ```bash
-curl -X POST "http://localhost:8090/v1/queries" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "graph_ids": ["YOUR_GRAPH_ID"],
-    "text": "What are the limitations of the system?",
-    "max_results": 3,
-    "summarize": false
-  }'
+curl -X POST http://localhost:8090/v1/documents -H "Authorization: Bearer $TDB_API_KEY" -F "file=@report.pdf"
 ```
 
----
+![Uploading a document returns a job id](assets/readme/document-upload.png)
 
-## Documentation & Deep Dives
+**3. Wait until it is indexed.** Poll the job until `state` is `COMPLETED`, then copy `result_graph_id`.
 
-Detailed guides, mathematical specifications, and evidence-based demonstrations are available in the [`docs/`](docs/) directory:
+```bash
+curl http://localhost:8090/v1/jobs/$JOB_ID -H "Authorization: Bearer $TDB_API_KEY"
+```
 
-| Guide | Description |
-|---|---|
-| [**Document Ingestion Pipeline**](docs/ingestion-pipeline.md) | File limits, background worker queue (`QUEUE_CAPACITY = 10`), and the 5 ingestion stages (`PARSING` &rarr; `PERSISTING`). |
-| [**Symbolic Indexing & Graph Construction**](docs/symbolic-indexing.md) | N-gram weights (trigrams `3.0`, bigrams `2.0`, unigrams `1.0`), edge types, IDF formulas, and section tree inspection. |
-| [**Structured Table Extraction**](docs/table-extraction.md) | How tables decompose into `table_row` and `table_cell` nodes, preserving column bindings and numerical tokens. |
-| [**Retrieval & Real Demonstrations**](docs/retrieval-and-demonstrations.md) | Verified input-to-output test runs, ranked JSON outputs, score breakdowns, and optional LLM summarization. |
-| [**Downstream Integration & Fulfillment Chat**](docs/fulfillment-chat-integration.md) | Sequence diagram showing how chat applications and agents consume TTT, plus static collection manifests. |
-| [**TTT vs. Conventional Chunking**](docs/chunking-comparison.md) | Detailed comparison against fixed, recursive, semantic, and parent-child chunking strategies. |
+![A completed job with its graph id](assets/readme/ingestion-completed.png)
 
----
+**4. Ask a question.**
 
-## Main API Endpoints
+```bash
+curl -X POST http://localhost:8090/v1/queries -H "Authorization: Bearer $TDB_API_KEY" -H "Content-Type: application/json" \
+  -d '{"graph_ids": ["'$GRAPH_ID'"], "text": "What are the limitations of the system?", "max_results": 3}'
+```
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | Service health status check |
-| `POST` | `/auth/signup` | Register a new user account |
-| `POST` | `/auth/login` | Authenticate and obtain JWT access token |
-| `POST` | `/auth/api-keys` | Generate persistent API key for `/v1/*` endpoints |
-| `GET` | `/v1/documents/constraints` | Get file type and size limits (100MB PDF, 50MB DOCX) |
-| `POST` | `/v1/documents` | Submit a PDF or DOCX for asynchronous indexing |
-| `GET` | `/v1/jobs/{job_id}` | Poll ingestion progress, status message, and graph ID |
-| `POST` | `/v1/jobs/{job_id}/cancel` | Cancel an ongoing ingestion job |
-| `POST` | `/v1/queries` | Search indexed document graphs and retrieve ranked elements |
-| `GET` | `/v1/tree/json` | Export the document hierarchy outline as JSON |
-| `GET` | `/index/html` | View interactive D3.js document graph in browser |
+![Ranked passages with page and heading path](assets/readme/query-results.png)
 
----
+From Python, [sdk-talkingdb](https://github.com/TalkingDB/sdk-talkingdb) does steps 2 to 4 in two calls. If anything fails, see [troubleshooting](docs/troubleshooting.md).
+
+## What TTT Is Not
+
+- **Not a [vector database](https://en.wikipedia.org/wiki/Vector_database).** It scores word overlap in the document graph; no embeddings are stored or compared.
+- **Not an answer generator.** Retrieval needs no language model. An [LLM](https://en.wikipedia.org/wiki/Large_language_model) is used only when you ask for `"summarize": true`, and only to summarise passages already retrieved ([details](docs/retrieval-and-demonstrations.md)).
+- **Not [OCR](https://en.wikipedia.org/wiki/Optical_character_recognition).** Scanned PDFs without a text layer are rejected; run OCR first.
+- **Not for every file type.** `.pdf` (up to 100 MB) and `.docx` (up to 50 MB) only.
+- **Not an entity linker.** Mapping words to known entities is [package-named-entity-linker](https://github.com/TalkingDB/package-named-entity-linker) and [package-parse-tree](https://github.com/TalkingDB/package-parse-tree).
+
+## Documentation
+
+| Read this | When you want to |
+| :--- | :--- |
+| [Concepts](docs/concepts.md) | Understand elements, the tree, symbols, [IDF](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) and scoring |
+| [Ingestion pipeline](docs/ingestion-pipeline.md) | Know what happens between upload and `COMPLETED` |
+| [Symbolic indexing](docs/symbolic-indexing.md) | See exactly how text becomes symbols and how scores are computed |
+| [Table extraction](docs/table-extraction.md) | Query tables down to a single cell |
+| [Retrieval and demonstrations](docs/retrieval-and-demonstrations.md) | See real requests, responses and summaries |
+| [Fulfillment chat integration](docs/fulfillment-chat-integration.md) | Build a chat app or agent on top of TTT |
+| [TTT vs. chunking](docs/chunking-comparison.md) | Compare with fixed, recursive and semantic chunking |
+| [API reference](docs/api-reference.md) | Find any endpoint |
+| [Troubleshooting](docs/troubleshooting.md) | Fix a problem |
 
 ## Related Repositories
 
-- [package-content-elementizer](https://github.com/TalkingDB/package-content-elementizer): Document parsing engine that elementizes PDF and DOCX files.
-- [base-tdb-models](https://github.com/TalkingDB/base-tdb-models): Shared data structures (`DocumentModel`, `GraphModel`, `FileIndexModel`, `ParagraphModel`, `TableModel`).
-- [base-tdb-clients](https://github.com/TalkingDB/base-tdb-clients): SQLite and storage connection clients.
-- [base-tdb-helpers](https://github.com/TalkingDB/base-tdb-helpers): Graph caching, auth verification, and file spooling utilities.
+| Repository | Role |
+| :--- | :--- |
+| [package-content-elementizer](https://github.com/TalkingDB/package-content-elementizer) | Reads PDF and DOCX into elements |
+| [base-tdb-models](https://github.com/TalkingDB/base-tdb-models), [base-tdb-helpers](https://github.com/TalkingDB/base-tdb-helpers), [base-tdb-clients](https://github.com/TalkingDB/base-tdb-clients) | Document and graph models, job store, [SQLite](https://www.sqlite.org/about.html) and [MinIO](https://en.wikipedia.org/wiki/MinIO) |
+| [sdk-talkingdb](https://github.com/TalkingDB/sdk-talkingdb) | Python client for this API |
+| [flowbot-chatbot-ttt](https://github.com/TalkingDB/flowbot-chatbot-ttt) | The chat front end that answers from TTT |
+| [infra-tdb-platform](https://github.com/TalkingDB/infra-tdb-platform) | Local setup and deployment |
+| [talkingdb-benchmarks](https://github.com/TalkingDB/talkingdb-benchmarks) | Public benchmarks run with TTT |
+
+## License
+
+Licensed under the GNU Affero General Public License v3.0 ([AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html)). See [LICENSE](LICENSE).

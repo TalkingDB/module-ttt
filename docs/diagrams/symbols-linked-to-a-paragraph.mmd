@@ -1,0 +1,19 @@
+graph TD
+    accTitle: Symbols linked to a paragraph
+    accDescr: A file contains headings that contain a paragraph. A trigram, a bigram and a unigram symbol each link to that paragraph with a contains edge, weighted 9, 4 and 1 by default.
+    Root["file@root<br>(Ask-Microsoft-<br>transparency-FAQ.pdf)"]
+    H1["heading:1<br>(Ask Microsoft: Responsible AI FAQ)"]
+    H2["heading:2<br>(What are the limitations...?)"]
+    P5["paragraph:5<br>(The chatbot uses AI...)"]
+    
+    SymTri["symbol::trigram<br>(limitation_ask_microsoft)"]
+    SymBi["symbol::bigram<br>(ask_microsoft)"]
+    SymUni["symbol::unigram<br>(limitation)"]
+
+    Root -->|part_of| H1
+    H1 -->|part_of| H2
+    H2 -->|part_of| P5
+
+    SymTri -->|"contains (trigram, x9)"| P5
+    SymBi -->|"contains (bigram, x4)"| P5
+    SymUni -->|"contains (unigram, x1)"| P5

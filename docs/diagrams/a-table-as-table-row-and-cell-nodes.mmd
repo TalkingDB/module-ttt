@@ -1,0 +1,17 @@
+graph TD
+    accTitle: A table as table, row and cell nodes
+    accDescr: A table node holds row nodes and each row holds cell nodes; each cell keeps its column name, so a single cell such as a recommendation number can be found and returned with its row.
+    TableNode["Table Node<br>(audit:table::1)"]
+    Row1["Table Row Node<br>(table::1:row::1)"]
+    Row2["Table Row Node<br>(table::1:row::2)"]
+    
+    Cell1["Cell Node: Rec No<br>(10/2025/01)"]
+    Cell2["Cell Node: Status<br>(Awaiting Response)"]
+    Cell3["Cell Node: Implementer<br>(Operations Unit)"]
+
+    TableNode -->|part_of| Row1
+    TableNode -->|part_of| Row2
+    
+    Row1 -->|part_of| Cell1
+    Row1 -->|part_of| Cell2
+    Row1 -->|part_of| Cell3

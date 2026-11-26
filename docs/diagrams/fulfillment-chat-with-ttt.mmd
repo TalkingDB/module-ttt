@@ -1,0 +1,20 @@
+sequenceDiagram
+    accTitle: Fulfillment chat with TTT
+    accDescr: A user asks the chat app a question. The app finds the graph ids for its documents, asks TTT for the top passages, sends the question and the exact passages to a language model, and shows the answer with clickable sources.
+    autonumber
+    actor User as Customer / User
+    participant ChatApp as Fulfillment Chat
+    participant TTT as TTT Service (module-ttt)
+    participant SQLite as SQLite Graph DB
+    participant LLM as Configured LLM (LiteLLM)
+
+    User->>ChatApp: "What are the limitations of the assistant?"
+    Note over ChatApp: Retrieves pre-indexed graph IDs<br>from collection manifest
+    ChatApp->>TTT: POST /v1/queries {graph_ids, text, max_results: 3}
+    TTT->>TTT: Tokenize query into n-grams (unigrams, bigrams, trigrams)
+    TTT->>SQLite: Traverse symbol nodes & score connected elements
+    SQLite-->>TTT: Return matching paragraphs, tables & scores
+    TTT-->>ChatApp: Return ranked elements + metadata (page, filename, heading_path)
+    ChatApp->>LLM: Send user prompt + exact retrieved excerpts
+    LLM-->>ChatApp: Synthesize natural-language answer with citations
+    ChatApp-->>User: Display answer with clickable source references

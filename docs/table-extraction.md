@@ -1,12 +1,14 @@
 # Structured Table Extraction
 
-Tables represent one of the most critical points of failure for conventional Retrieval-Augmented Generation (RAG) systems. This document explains how TTT decomposes multi-column tables into relational graph structures and demonstrates deterministic table retrieval.
+[Docs home](README.md) › Table extraction
+
+Tables represent one of the most critical points of failure for conventional Retrieval-Augmented Generation ([RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation)) systems. This document explains how TTT decomposes multi-column tables into relational graph structures and demonstrates deterministic table retrieval.
 
 ---
 
 ## 1. The Table Problem in Conventional RAG
 
-Standard embedding models treat documents as continuous streams of text. When a table is split into fixed-size chunks:
+Standard [embedding](https://en.wikipedia.org/wiki/Word_embedding) models treat documents as continuous streams of text. When a table is split into fixed-size chunks:
 1. **Severed Column Bindings:** Column headers are separated from data cells further down the page.
 2. **Broken Row Integrity:** Rows spanning chunk boundaries get split across vectors.
 3. **Loss of Numerical Context:** Numbers like `$45,000` or `10/2025/01` lose their associated labels and column identifiers.
@@ -19,23 +21,12 @@ As a result, queries asking for a specific cell value (e.g., *"What is the statu
 
 TTT parses tables structurally into a 3-tier node hierarchy connected by `part_of` edges:
 
-```mermaid
-graph TD
-    TableNode["Table Node<br>(audit:table::1)"]
-    Row1["Table Row Node<br>(table::1:row::1)"]
-    Row2["Table Row Node<br>(table::1:row::2)"]
-    
-    Cell1["Cell Node: Rec No<br>(10/2025/01)"]
-    Cell2["Cell Node: Status<br>(Awaiting Response)"]
-    Cell3["Cell Node: Implementer<br>(Operations Unit)"]
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/a-table-as-table-row-and-cell-nodes-dark.svg">
+  <img alt="A table node holds row nodes and each row holds cell nodes; each cell keeps its column name, so a single cell such as a recommendation number can be found and returned with its row." src="images/a-table-as-table-row-and-cell-nodes.svg">
+</picture>
 
-    TableNode -->|part_of| Row1
-    TableNode -->|part_of| Row2
-    
-    Row1 -->|part_of| Cell1
-    Row1 -->|part_of| Cell2
-    Row1 -->|part_of| Cell3
-```
+<sub>Diagram source: [a-table-as-table-row-and-cell-nodes.mmd](diagrams/a-table-as-table-row-and-cell-nodes.mmd). Edit it and re-render with the steps in [docs/diagrams](diagrams/README.md).</sub>
 
 - **Table Node (`type: table`):** Represents the entire table container, capturing captions and surrounding section headers.
 - **Table Row Node (`type: table_row`):** Groups all cells belonging to a single record, indexing the row header.
@@ -85,7 +76,11 @@ graph TD
 
 Standard NLP tokenizers discard slashes, dashes, and punctuation, reducing `10/2025/01` to isolated tokens `10`, `2025`, `01`. 
 
-TTT's `tokenize_structured` tokenizer:
+TTT's `tokenize_structured` [tokenizer](https://spacy.io/usage/linguistic-features#tokenization):
 1. Recognizes reference identifiers, codes, dates, and currency values.
 2. Preserves the full token composite (`10_2025_01`).
 3. Awards the highest trigram weight (`3.0`), ensuring exact cell and row retrieval without hallucination.
+
+---
+
+**Related:** [Concepts: the tree](concepts.md#the-tree) · [Symbolic indexing](symbolic-indexing.md) · [Railway tables benchmark](https://github.com/TalkingDB/talkingdb-benchmarks/tree/main/railway-tables) · [base-tdb-models table model](https://github.com/TalkingDB/base-tdb-models/blob/main/talkingdb/models/document/elements/primitive/table.py)
