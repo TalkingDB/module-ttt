@@ -1,0 +1,10 @@
+{
+  "htmlLabels": false,
+  "theme": "dark",
+  "flowchart": {
+    "htmlLabels": false
+  },
+  "themeVariables": {
+    "background": "#0d1117"
+  }
+}

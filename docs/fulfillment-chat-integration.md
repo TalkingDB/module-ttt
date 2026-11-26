@@ -1,33 +1,21 @@
 # Downstream Integration & Fulfillment Chat
 
+[Docs home](README.md) › Fulfillment chat integration
+
 This document details how external applications—such as conversational chatbots, enterprise agents, or search portals—integrate with TTT.
 
 ---
 
 ## 1. Fulfillment Chat Sequence Architecture
 
-Fulfillment Chat demonstrates the recommended integration pattern connecting an external customer UI, TTT, and a conversational LLM:
+Fulfillment Chat demonstrates the recommended integration pattern connecting an external customer UI, TTT, and a conversational [LLM](https://en.wikipedia.org/wiki/Large_language_model):
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as Customer / User
-    participant ChatApp as Fulfillment Chat
-    participant TTT as TTT Service (module-ttt)
-    participant SQLite as SQLite Graph DB
-    participant LLM as Configured LLM (LiteLLM)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/fulfillment-chat-with-ttt-dark.svg">
+  <img alt="A user asks the chat app a question. The app finds the graph ids for its documents, asks TTT for the top passages, sends the question and the exact passages to a language model, and shows the answer with clickable sources." src="images/fulfillment-chat-with-ttt.svg">
+</picture>
 
-    User->>ChatApp: "What are the limitations of the assistant?"
-    Note over ChatApp: Retrieves pre-indexed graph IDs<br>from collection manifest
-    ChatApp->>TTT: POST /v1/queries {graph_ids, text, max_results: 3}
-    TTT->>TTT: Tokenize query into n-grams (unigrams, bigrams, trigrams)
-    TTT->>SQLite: Traverse symbol nodes & score connected elements
-    SQLite-->>TTT: Return matching paragraphs, tables & scores
-    TTT-->>ChatApp: Return ranked elements + metadata (page, filename, heading_path)
-    ChatApp->>LLM: Send user prompt + exact retrieved excerpts
-    LLM-->>ChatApp: Synthesize natural-language answer with citations
-    ChatApp-->>User: Display answer with clickable source references
-```
+<sub>Diagram source: [fulfillment-chat-with-ttt.mmd](diagrams/fulfillment-chat-with-ttt.mmd). Edit it and re-render with the steps in [docs/diagrams](diagrams/README.md).</sub>
 
 ---
 
@@ -87,3 +75,7 @@ curl -X POST "http://localhost:8090/v1/queries" \
     "summarize": false
   }'
 ```
+
+---
+
+**Related:** [API reference](api-reference.md) · [flowbot-chatbot-ttt, a working chat app on TTT](https://github.com/TalkingDB/flowbot-chatbot-ttt) · [sdk-talkingdb](https://github.com/TalkingDB/sdk-talkingdb) · [Retrieval and demonstrations](retrieval-and-demonstrations.md)

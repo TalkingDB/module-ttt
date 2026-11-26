@@ -1,30 +1,21 @@
 # Deterministic Retrieval & Real Demonstrations
 
+[Docs home](README.md) › Retrieval and demonstrations
+
 This document presents actual input-to-output retrieval demonstrations run directly against real documents in this repository.
 
 ---
 
 ## 1. Retrieval Mechanism (`POST /v1/queries`)
 
-Unlike vector similarity search (which computes cosine distance across embedding vectors), TTT performs **deterministic graph traversal**:
+Unlike vector similarity search (which computes cosine distance across [embedding](https://en.wikipedia.org/wiki/Word_embedding) vectors), TTT performs **deterministic graph traversal**:
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API as /v1/queries
-    participant Tokenizer as spaCy Tokenizer
-    participant Graph as SQLite Graph DB
-    participant Ranker as Relevance Scorer
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ttt-query-sequence-dark.svg">
+  <img alt="The client posts a question. TTT turns it into lemmatized one, two and three word symbols, looks the symbols up in the document graph, scores connected elements by gram weight times IDF, and returns ranked passages with page and heading path." src="images/ttt-query-sequence.svg">
+</picture>
 
-    Client->>API: POST /v1/queries {graph_ids, text, max_results}
-    API->>Tokenizer: Extract lemmatized n-grams (1-gram, 2-gram, 3-gram)
-    Tokenizer-->>API: Query symbols
-    API->>Graph: Look up symbol nodes & traverse edges to elements
-    Graph-->>API: Connected elements + edge types (contains, context)
-    API->>Ranker: Calculate GRAM_WEIGHT × IDF score
-    Ranker-->>API: Ranked elements sorted by score
-    API-->>Client: 200 OK (Ranked excerpts + page + heading_path)
-```
+<sub>Diagram source: [ttt-query-sequence.mmd](diagrams/ttt-query-sequence.mmd). Edit it and re-render with the steps in [docs/diagrams](diagrams/README.md).</sub>
 
 ---
 
@@ -86,6 +77,10 @@ curl -X POST "http://localhost:8090/v1/queries" \
 
 When `"summarize": true` is passed, TTT executes a post-retrieval synthesis step via [LiteLLM](https://docs.litellm.ai/):
 
-- **Input to LLM:** Only the top-ranked retrieved elements and their metadata.
+- **Input to [LLM](https://en.wikipedia.org/wiki/Large_language_model):** Only the top-ranked retrieved elements and their metadata.
 - **Role of LLM:** The LLM does **not** search or index; it only synthesizes a natural language summary from the retrieved evidence.
 - **Output:** Populates the `"summary"` field in the response JSON.
+
+---
+
+**Related:** [Concepts: scoring](concepts.md#scoring-a-passage) · [API reference](api-reference.md) · [Fulfillment chat integration](fulfillment-chat-integration.md) · [sdk-talkingdb](https://github.com/TalkingDB/sdk-talkingdb)

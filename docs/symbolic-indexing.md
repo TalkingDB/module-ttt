@@ -1,6 +1,8 @@
 # Symbolic Indexing & Graph Construction
 
-TTT replaces opaque, lossy vector embeddings with **deterministic symbolic graph indexing**. This document explains the exact tokenization pipeline, n-gram weights, edge relationship types, and relevance scoring mathematics.
+[Docs home](README.md) › Symbolic indexing
+
+TTT replaces opaque, lossy vector [embeddings](https://en.wikipedia.org/wiki/Word_embedding) with **deterministic symbolic graph indexing**. This document explains the exact tokenization pipeline, [n-gram](https://en.wikipedia.org/wiki/N-gram) weights, edge relationship types, and relevance scoring mathematics.
 
 ---
 
@@ -8,7 +10,7 @@ TTT replaces opaque, lossy vector embeddings with **deterministic symbolic graph
 
 A [noun phrase](https://dictionary.cambridge.org/grammar/british-grammar/noun-phrases) in grammar is a word or phrase naming a person, place, or concept (e.g., `network access policy`). While indexed terms frequently look like noun phrases, **TTT does not execute a grammatical noun phrase parser**.
 
-Instead, TTT implements **adjacent word n-gram indexing** with [spaCy](https://spacy.io/usage/linguistic-features#tokenization) lemmatization:
+Instead, TTT implements **adjacent word n-gram indexing** with [spaCy](https://spacy.io/usage/linguistic-features#tokenization) [lemmatization](https://en.wikipedia.org/wiki/Lemmatisation):
 
 ```
 "Network access policy controls customer authentication."
@@ -21,11 +23,11 @@ Tokens: ['network', 'access', 'policy', 'control', 'customer', 'authentication']
 [2. N-Gram Symbol Generation] (app/services/package_symbol_generator.py)
 ```
 
-| Symbol Type | Definition | Generated Example Symbols | Weight (`GRAM_WEIGHTS`) |
+| Symbol Type | Definition | Generated Example Symbols | Default weight (`GRAM_WEIGHTS`) |
 |---|---|---|---|
-| [Unigram](https://developers.google.com/machine-learning/glossary#n-gram) | Single normalized token | `network`, `access`, `policy`, `control`, `customer`, `authentication` | `1.0` |
-| [Bigram](https://developers.google.com/machine-learning/glossary#bigram) | Two adjacent tokens | `network_access`, `access_policy`, `policy_control`, `control_customer`, `customer_authentication` | `2.0` |
-| [Trigram](https://developers.google.com/machine-learning/glossary#trigram) | Three adjacent tokens | `network_access_policy`, `access_policy_control`, `policy_control_customer`, `control_customer_authentication` | `3.0` |
+| [Unigram](https://developers.google.com/machine-learning/glossary#n-gram) | Single normalized token | `network`, `access`, `policy`, `control`, `customer`, `authentication` | `1` |
+| [Bigram](https://developers.google.com/machine-learning/glossary#bigram) | Two adjacent tokens | `network_access`, `access_policy`, `policy_control`, `control_customer`, `customer_authentication` | `4` |
+| [Trigram](https://developers.google.com/machine-learning/glossary#trigram) | Three adjacent tokens | `network_access_policy`, `access_policy_control`, `policy_control_customer`, `control_customer_authentication` | `9` |
 
 ---
 
@@ -40,27 +42,14 @@ Tokens: ['network', 'access', 'policy', 'control', 'customer', 'authentication']
 
 ## 3. Directed Graph Topology
 
-TTT builds an in-memory [NetworkX](https://networkx.org/documentation/stable/tutorial.html) directed graph for each document, which is subsequently serialized to SQLite.
+TTT builds an in-memory [NetworkX](https://networkx.org/documentation/stable/tutorial.html) directed graph for each document, which is subsequently serialized to [SQLite](https://www.sqlite.org/about.html).
 
-```mermaid
-graph TD
-    Root["file@root<br>(Ask-Microsoft-transparency-FAQ.pdf)"]
-    H1["heading:1<br>(Ask Microsoft: Responsible AI FAQ)"]
-    H2["heading:2<br>(What are the limitations...?)"]
-    P5["paragraph:5<br>(The chatbot uses AI...)"]
-    
-    SymTri["symbol::trigram<br>(limitation_ask_microsoft)"]
-    SymBi["symbol::bigram<br>(ask_microsoft)"]
-    SymUni["symbol::unigram<br>(limitation)"]
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/symbols-linked-to-a-paragraph-dark.svg">
+  <img alt="A file contains headings that contain a paragraph. A trigram, a bigram and a unigram symbol each link to that paragraph with a contains edge, weighted 9, 4 and 1 by default." src="images/symbols-linked-to-a-paragraph.svg">
+</picture>
 
-    Root -->|part_of| H1
-    H1 -->|part_of| H2
-    H2 -->|part_of| P5
-
-    SymTri -->|contains (weight: 3.0)| P5
-    SymBi -->|contains (weight: 2.0)| P5
-    SymUni -->|contains (weight: 1.0)| P5
-```
+<sub>Diagram source: [symbols-linked-to-a-paragraph.mmd](diagrams/symbols-linked-to-a-paragraph.mmd). Edit it and re-render with the steps in [docs/diagrams](diagrams/README.md).</sub>
 
 ### Node Types
 - `file@root`: Document root node containing global metadata (filename, page count).
@@ -89,15 +78,31 @@ When a query is received:
 
 The element relevance score is calculated as:
 
-$$\text{Score}(e) = \sum_{s \in \text{MatchedSymbols}(e)} \text{GRAM\_WEIGHT}(s) \times \text{IDF}(s) \times \text{EDGE\_WEIGHT}(s, e)$$
+```text
+score(element) = sum, over every query symbol linked to the element, of
+                 GRAM_WEIGHT(symbol) × IDF(symbol) × EDGE_WEIGHT(edge)
 
-Where:
-- $\text{GRAM\_WEIGHT}$: `3.0` for trigrams, `2.0` for bigrams, `1.0` for unigrams.
-- $\text{EDGE\_WEIGHT}$: `1.0` for direct `contains` edges; `0.4` for inherited `context` edges.
-- $\text{IDF}$ (Inverse Document Frequency):
-  $$\text{IDF}(s) = \ln\left(\frac{N}{\text{DF}(s)}\right)$$
-  - $N$: Total number of elements in the document graph.
-  - $\text{DF}(s)$: Number of elements containing symbol $s$.
+IDF(symbol)    = ln(1 + N / DF(symbol))
+```
+
+| Part | Meaning | Default |
+| :--- | :--- | :--- |
+| `GRAM_WEIGHT` | How much a match of this length counts | `9` trigram, `4` bigram, `1` unigram; set with `TDB_GRAM_WEIGHT_TRIGRAM`, `TDB_GRAM_WEIGHT_BIGRAM`, `TDB_GRAM_WEIGHT_UNIGRAM` ([`app/core/config.py`](../app/core/config.py)) |
+| `EDGE_WEIGHT` | Direct match or match through context | `1.0` for `contains`, `0.4` for `context` (`TDB_CONTEXT_MATCH_WEIGHT`) |
+| [`IDF`](https://en.wikipedia.org/wiki/Tf%E2%80%93idf#Inverse_document_frequency) | Inverse document frequency: rare symbols count more | `ln` is the natural logarithm |
+| `N` | Elements in the document graph (paragraphs, tables, rows and cells) | |
+| `DF` | Elements linked to the symbol by a direct `contains` edge; `context` edges do not count | |
+
+**Worked example** (made up numbers, to show the arithmetic). A document has `N = 100` elements and a paragraph matches three query symbols directly:
+
+| Symbol | Kind | DF | IDF = ln(1 + 100 / DF) | × GRAM_WEIGHT | Adds |
+| :--- | :--- | ---: | ---: | ---: | ---: |
+| `policy` | unigram | 40 | 1.253 | × 1 | 1.253 |
+| `authentication` | unigram | 5 | 3.045 | × 1 | 3.045 |
+| `customer_authentication` | bigram | 2 | 3.932 | × 4 | 15.727 |
+| | | | | **Score** | **20.025** |
+
+The common word `policy` adds little; the rare two word phrase adds most of the score.
 
 Higher-order n-grams provide a deterministic multi-word phrase boost. Rare, distinctive terms receive higher IDF weights than generic terms.
 
@@ -112,3 +117,7 @@ Clients can retrieve the full hierarchical outline of a document via `GET /v1/tr
 The tree JSON preserves:
 - Heading hierarchy (H1 &rarr; H2 &rarr; H3 &rarr; paragraphs).
 - Provenance: File name, page number, and full `heading_path` breadcrumbs.
+
+---
+
+**Related:** [Concepts: symbols and scoring](concepts.md#symbols) · [Table extraction](table-extraction.md) · [Retrieval and demonstrations](retrieval-and-demonstrations.md) · [Troubleshooting: no useful matches](troubleshooting.md#6-a-query-returns-no-useful-matches)

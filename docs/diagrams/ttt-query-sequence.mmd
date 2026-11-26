@@ -1,0 +1,17 @@
+sequenceDiagram
+    accTitle: TTT query sequence
+    accDescr: The client posts a question. TTT turns it into lemmatized one, two and three word symbols, looks the symbols up in the document graph, scores connected elements by gram weight times IDF, and returns ranked passages with page and heading path.
+    participant Client
+    participant API as /v1/queries
+    participant Tokenizer as spaCy Tokenizer
+    participant Graph as SQLite Graph DB
+    participant Ranker as Relevance Scorer
+
+    Client->>API: POST /v1/queries {graph_ids, text, max_results}
+    API->>Tokenizer: Extract lemmatized n-grams (1-gram, 2-gram, 3-gram)
+    Tokenizer-->>API: Query symbols
+    API->>Graph: Look up symbol nodes & traverse edges to elements
+    Graph-->>API: Connected elements + edge types (contains, context)
+    API->>Ranker: Calculate GRAM_WEIGHT × IDF score
+    Ranker-->>API: Ranked elements sorted by score
+    API-->>Client: 200 OK (Ranked excerpts + page + heading_path)

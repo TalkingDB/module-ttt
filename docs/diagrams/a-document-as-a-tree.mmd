@@ -1,0 +1,9 @@
+flowchart TB
+    accTitle: A document as a tree
+    accDescr: The file is the root. Headings sit under the file and under each other. Paragraphs and tables sit under their heading. Rows sit under their table and cells under their row.
+    F["File: annual-report.pdf"] --> H1["Heading 1: Risks"]
+    H1 --> H2["Heading 2: Supply chain"]
+    H2 --> P["Paragraph"]
+    H2 --> T["Table"]
+    T --> R["Row"]
+    R --> C["Cell<br>(with its column name)"]

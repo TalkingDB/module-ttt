@@ -1,5 +1,7 @@
 # TTT Troubleshooting
 
+[Docs home](README.md) › Troubleshooting
+
 This guide covers common problems when running TTT locally with Docker and using its API.
 
 ## 1. The service does not start
@@ -134,3 +136,7 @@ Invoke-RestMethod http://localhost:8090/health
 ```
 
 For endpoint details, use [the local API documentation](http://localhost:8090/docs) or the [hosted TTT API reference](https://ttt-rc4.talkingdb.io/docs).
+
+---
+
+**Related:** [API reference](api-reference.md) · [Ingestion pipeline](ingestion-pipeline.md) · [Concepts](concepts.md) · [infra-tdb-platform troubleshooting](https://github.com/TalkingDB/infra-tdb-platform/blob/main/docs/troubleshooting.md)

@@ -1,0 +1,9 @@
+flowchart LR
+    accTitle: TTT ingestion stages
+    accDescr: A queued job is parsed, its elements are extracted, a heading tree is generated, the text is indexed into symbols, and the graph is persisted to SQLite before the job completes.
+    A["QUEUED"] --> B["PARSING<br>(pdf2docx / layout)"]
+    B --> C["ELEMENT_EXTRACTION<br>(paragraphs and tables)"]
+    C --> D["TREE_GENERATION<br>(heading outline)"]
+    D --> E["INDEXING<br>(n-gram symbols)"]
+    E --> F["PERSISTING<br>(SQLite graphs.db)"]
+    F --> G["COMPLETED"]

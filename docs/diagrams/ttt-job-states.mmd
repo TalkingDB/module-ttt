@@ -1,0 +1,11 @@
+stateDiagram-v2
+    accTitle: TTT job states
+    accDescr: An upload creates a queued job. A worker starts it and it becomes ongoing, moving through parsing, element extraction, tree generation, indexing and persisting, then completes or fails. Cancelling a queued job ends it at once; cancelling an ongoing job passes through cancelling. A failed job can be retried.
+    [*] --> QUEUED: POST /v1/documents
+    QUEUED --> ONGOING: a worker starts it
+    ONGOING --> COMPLETED: result_graph_id is set
+    ONGOING --> FAILED
+    QUEUED --> CANCELLED: cancel
+    ONGOING --> CANCELLING: cancel
+    CANCELLING --> CANCELLED
+    FAILED --> QUEUED: retry

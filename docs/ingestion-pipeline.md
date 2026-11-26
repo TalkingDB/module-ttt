@@ -1,5 +1,7 @@
 # Document Ingestion & Background Queue
 
+[Docs home](README.md) › Ingestion pipeline
+
 TTT processes documents asynchronously through a multi-stage background pipeline. This document details the upload constraints, worker queue configuration, and pipeline lifecycle stages.
 
 ---
@@ -34,7 +36,7 @@ curl -X POST "http://localhost:8090/v1/documents" \
 
 ## 2. Queue Configuration & Concurrency
 
-- **Queue Capacity:** The in-process ingestion queue allows up to **10 concurrent jobs** (`QUEUE_CAPACITY = 10` in `app/core/config.py`).
+- **Queue Capacity:** Up to `QUEUE_CAPACITY` jobs can be admitted at once. It defaults to twice the number of workers (`TDB_JOB_QUEUE_CAPACITY`), and the number of workers defaults to the smaller of 4 and the machine's CPU count (`TDB_JOB_MAX_WORKERS`), both in [`app/core/config.py`](../app/core/config.py).
 - **Rejection Behavior:** If the queue is saturated, `/v1/documents` returns `429 Too Many Requests`.
 - **Worker Execution:** A dedicated worker background task (`app/services/jobs.py`) pulls jobs from the queue FIFO and processes each document through the 5 pipeline stages.
 
@@ -44,31 +46,28 @@ curl -X POST "http://localhost:8090/v1/documents" \
 
 Every document transitions sequentially through five deterministic processing stages:
 
-```mermaid
-flowchart LR
-    A["QUEUED"] --> B["PARSING<br>(pdf2docx / layout)"]
-    B --> C["EXTRACTION<br>(paragraphs & tables)"]
-    C --> D["TREE_GEN<br>(heading outline)"]
-    D --> E["INDEXING<br>(n-gram symbols)"]
-    E --> F["PERSISTING<br>(SQLite graphs.db)"]
-    F --> G["COMPLETED"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/ttt-ingestion-stages-dark.svg">
+  <img alt="A queued job is parsed, its elements are extracted, a heading tree is generated, the text is indexed into symbols, and the graph is persisted to SQLite before the job completes." src="images/ttt-ingestion-stages.svg">
+</picture>
+
+<sub>Diagram source: [ttt-ingestion-stages.mmd](diagrams/ttt-ingestion-stages.mmd). Edit it and re-render with the steps in [docs/diagrams](diagrams/README.md).</sub>
 
 1. **`PARSING`**:
    - For PDFs: Converts PDF pages to internal DOCX flow using `pdf2docx` or parses layout primitives.
    - For DOCX: Reads document element tree directly using python-docx.
-2. **`EXTRACTION`**:
+2. **`ELEMENT_EXTRACTION`**:
    - Invokes `package-content-elementizer` to extract headings, paragraphs, tables, rows, and cells.
    - Retains physical coordinates: page number, bounding layout, and reading order.
-3. **`TREE_GEN`**:
+3. **`TREE_GENERATION`**:
    - Organizes sections and headings (H1 through H6) into a hierarchical outline tree (`FileIndexModel`).
    - Links paragraphs and tables to their immediate parent heading via directed `part_of` edges.
 4. **`INDEXING`**:
-   - Tokenizes and lemmatizes text into unigrams, bigrams, and trigrams using spaCy (`en_core_web_sm`).
+   - [Tokenizes](https://spacy.io/usage/linguistic-features#tokenization) and [lemmatizes](https://en.wikipedia.org/wiki/Lemmatisation) text into unigrams, bigrams, and trigrams using [spaCy](https://spacy.io/usage/spacy-101) (`en_core_web_md`).
    - Applies `tokenize_structured` to tables to preserve numerical codes, years, and reference IDs.
-   - Computes document-wide inverse document frequency (IDF) weights.
+   - Computes document-wide inverse document frequency ([IDF](https://en.wikipedia.org/wiki/Tf%E2%80%93idf)) weights.
 5. **`PERSISTING`**:
-   - Writes the constructed NetworkX directed graph into SQLite (`data/graphs.db`).
+   - Writes the constructed [NetworkX](https://networkx.org/documentation/stable/) directed graph into [SQLite](https://www.sqlite.org/about.html) (`data/graphs.db`).
    - Generates a permanent `result_graph_id` (e.g. `graph::62405fb8028748d58e091228bdd86305`).
 
 ![Ingestion completed lifecycle](../assets/readme/ingestion-completed.png)
@@ -115,3 +114,7 @@ curl -X POST "http://localhost:8090/v1/jobs/YOUR_JOB_ID/cancel" \
 ```
 
 If the job is still queued or running, TTT halts processing and marks the state as `CANCELLED`.
+
+---
+
+**Related:** [Concepts: jobs](concepts.md#jobs-from-upload-to-graph) · [Symbolic indexing](symbolic-indexing.md) · [Content elementizer](https://github.com/TalkingDB/package-content-elementizer) · [Troubleshooting: stuck jobs](troubleshooting.md#5-the-job-stays-queued-fails-or-does-not-complete)
