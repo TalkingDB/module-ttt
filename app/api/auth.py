@@ -1,8 +1,15 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from talkingdb.clients.sqlite import sqlite_conn, GRAPH_DB
-from talkingdb.helpers.auth import hash_password, verify_password
+from talkingdb.helpers.auth import hash_password, verify_password, verify_service_secret
 from talkingdb.helpers.jwt import create_access_token, get_current_user
-from talkingdb.models.auth.auth import SignupRequest, SignupResponse, LoginRequest, LoginResponse
+from talkingdb.models.auth.auth import (
+    SignupRequest,
+    SignupResponse,
+    LoginRequest,
+    LoginResponse,
+    ServiceApiKeyRequest,
+    ServiceApiKeyResponse,
+)
 from talkingdb.models.auth.api_key import APIKeyModel
 from talkingdb.models.auth.user import UserModel
 
@@ -78,6 +85,24 @@ def create_api_key(user_email: str = Depends(get_current_user)):
         api_key_obj = APIKeyModel.create(
             conn=conn,
             user_email=user_email,
+        )
+
+    return {
+        "api_key": api_key_obj.api_key,
+        "created_at": api_key_obj.created_at,
+    }
+
+
+@router.post(
+    "/service/api-keys",
+    response_model=ServiceApiKeyResponse,
+    dependencies=[Depends(verify_service_secret)],
+)
+def get_or_create_service_api_key(payload: ServiceApiKeyRequest):
+    with sqlite_conn(GRAPH_DB) as conn:
+        api_key_obj = APIKeyModel.get_or_create(
+            conn=conn,
+            user_email=payload.email.lower(),
         )
 
     return {
