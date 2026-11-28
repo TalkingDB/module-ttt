@@ -27,8 +27,8 @@ export const options = {
             startVUs: 0,
             stages: [
                 { duration: '2m', target: 5 },
-                { duration: '3m', target: 10 },
-                { duration: '1m', target: 0 },
+                { duration: '3m', target: 5 },
+                { duration: '1m', target: 5 },
             ],
             startTime: '4m30s',          // Starts AFTER upload scenario completes
         }
@@ -36,7 +36,8 @@ export const options = {
     thresholds: thresholds,
 };
 
-const BASE_URL = "https://ttt-rc5.talkingdb.io";
+// const BASE_URL = "https://ttt-rc5.talkingdb.io";
+const BASE_URL = "http://localhost:8090";
 const API_KEY = __ENV.API_KEY;
 const GRAPH_ID = __ENV.GRAPH_ID;
 

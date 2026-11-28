@@ -55,6 +55,94 @@ from app.services import jobs
 router = APIRouter(prefix="/v1", tags=["Jobs"])
 
 
+# ---------------------------------------------------------------------------
+# Synchronous DB helpers.
+#
+# Every one of these touches `sqlite_conn`, which hands back a blocking
+# sqlite3 connection. Called directly from an `async def` endpoint they run
+# on the event loop and stall every other in-flight request for as long as
+# the write is queued behind SQLite's writer lock (busy_timeout is several
+# seconds). They must always be invoked through `run_in_threadpool` so the
+# blocking wait happens on a worker thread instead.
+def _persist_job_and_mapping(
+    job: JobModel, channel: str, file_hash: str, filename: Optional[str]
+) -> None:
+    with sqlite_conn(GRAPH_DB) as conn:
+        job_store.insert(conn, job)
+        file_graph_store.insert(
+            conn,
+            channel=channel,
+            file_hash=file_hash,
+            job_id=job.job_id,
+            filename=filename,
+        )
+
+
+def _rollback_job_and_mapping(job_id: str) -> None:
+    with sqlite_conn(GRAPH_DB) as conn:
+        job_store.delete(conn, job_id)
+        file_graph_store.delete_by_job_id(conn, job_id)
+
+
+def _rollback_job_mapping_and_check_remaining(
+    job_id: str, channel: str, file_hash: str
+):
+    with sqlite_conn(GRAPH_DB) as conn:
+        job_store.delete(conn, job_id)
+        file_graph_store.delete_by_job_id(conn, job_id)
+        return file_graph_store.get_by_channel_hash(conn, channel, file_hash)
+
+
+def _list_documents_sync(session_id: Optional[str], limit: int, offset: int):
+    with sqlite_conn(GRAPH_DB) as conn:
+        return job_store.list_documents(conn, session_id, limit=limit, offset=offset)
+
+
+def _remove_document_sync(job_id: str):
+    """Cancel/delete a job and its associated rows in one connection.
+
+    Returns ``(deleted, final, graph_id, file_to_delete, temp_path)``.
+    """
+    deleted = False
+    graph_id: Optional[str] = None
+    file_to_delete: Optional[tuple[str, str]] = None
+
+    with sqlite_conn(GRAPH_DB) as conn:
+        job = job_store.get(conn, job_id)
+        if job is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error_code": "JOB_NOT_FOUND", "message": f"Unknown job id: {job_id}"},
+            )
+
+        # Cancel first if still running; decide what to delete from the
+        # *post-cancel* state so the response and cleanup never race the worker.
+        final = job if job.is_terminal() else (job_store.request_cancel(conn, job_id) or job)
+
+        if final.is_terminal():
+            graph_id = final.result_graph_id
+            if graph_id:
+                graph_store.delete(conn, graph_id)
+            job_store.delete(conn, job_id)
+
+            mapping = file_graph_store.get_by_job_id(conn, job_id)
+            if mapping is not None:
+                file_graph_store.delete_by_job_id(conn, job_id)
+                remaining = file_graph_store.get_by_channel_hash(
+                    conn, mapping.channel, mapping.file_hash)
+                if not remaining:
+                    file_to_delete = (mapping.channel, mapping.file_hash)
+
+            deleted = True
+
+    return deleted, final, graph_id, file_to_delete, job.temp_path
+
+
+def _get_mapping_by_graph_id_sync(graph_id: str):
+    with sqlite_conn(GRAPH_DB) as conn:
+        return file_graph_store.get_by_graph_id(conn, graph_id)
+
+
 @router.get(
     "/documents/constraints",
     response_model=UploadConstraintsResponse,
@@ -137,19 +225,19 @@ async def submit_document_job(
 
     assert_content_length_within_cap(request.headers.get("content-length"), ext)
 
-    namespace = validate_namespace(namespace)
+    namespace = await run_in_threadpool(validate_namespace, namespace)
     project_id = clean_optional_text(project_id)
     parsed_queries = parse_suggested_queries(suggested_queries)
     title = clean_optional_text(title)
     description = clean_optional_text(description)
 
     if project_id is not None:
-        validate_project_owned(project_id, owner_email)
+        await run_in_threadpool(validate_project_owned, project_id, owner_email)
 
-    spool.assert_spool_capacity()
+    await run_in_threadpool(spool.assert_spool_capacity)
 
     try:
-        jobs.acquire_slot()
+        await run_in_threadpool(jobs.acquire_slot)
     except jobs.QueueFull:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -194,15 +282,9 @@ async def submit_document_job(
         # another request's dedup-delete cleanup runs concurrently for the
         # same (channel, hash), it sees this row and won't remove the object
         # out from under us. See TAL-797 race-condition discussion.
-        with sqlite_conn(GRAPH_DB) as conn:
-            job_store.insert(conn, job)
-            file_graph_store.insert(
-                conn,
-                channel=channel,
-                file_hash=file_hash,
-                job_id=job.job_id,
-                filename=file.filename,
-            )
+        await run_in_threadpool(
+            _persist_job_and_mapping, job, channel, file_hash, file.filename
+        )
 
         try:
             await run_in_threadpool(
@@ -212,9 +294,7 @@ async def submit_document_job(
             # Upload genuinely failed (not a dedup race) - roll back the
             # job/mapping rows we just created so nothing points at a file
             # that was never actually stored.
-            with sqlite_conn(GRAPH_DB) as conn:
-                job_store.delete(conn, job.job_id)
-                file_graph_store.delete_by_job_id(conn, job.job_id)
+            await run_in_threadpool(_rollback_job_and_mapping, job.job_id)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail={
@@ -236,10 +316,10 @@ async def submit_document_job(
             # they're orphaned: the mapping keeps pointing at a job that no
             # longer exists, and the blob is never reference-counted down.
             # Remove all three so nothing is left behind.
-            with sqlite_conn(GRAPH_DB) as conn:
-                job_store.delete(conn, job.job_id)
-                file_graph_store.delete_by_job_id(conn, job.job_id)
-                remaining = file_graph_store.get_by_channel_hash(conn, channel, file_hash)
+            remaining = await run_in_threadpool(
+                _rollback_job_mapping_and_check_remaining,
+                job.job_id, channel, file_hash,
+            )
             if not remaining:
                 await run_in_threadpool(file_store.delete_file, channel, file_hash)
             raise
@@ -256,7 +336,7 @@ async def submit_document_job(
     finally:
         if not enqueued:
             spool.discard(temp_path)
-            jobs.release_slot()
+            await run_in_threadpool(jobs.release_slot)
 
 
 @router.get(
@@ -274,8 +354,7 @@ async def list_documents(
     offset: int = Query(0, ge=0, description="Number of documents to skip"),
     api_key: str = Depends(verify_api_key),
 ) -> List[JobStatusResponse]:
-    with sqlite_conn(GRAPH_DB) as conn:
-        items = job_store.list_documents(conn, session_id, limit=limit, offset=offset)
+    items = await run_in_threadpool(_list_documents_sync, session_id, limit, offset)
     return [JobStatusResponse(**job.to_status_payload()) for job in items]
 
 
@@ -293,45 +372,16 @@ async def remove_document(
     job_id: str = Path(..., description="Document (job) id to remove"),
     api_key: str = Depends(verify_api_key),
 ) -> JobStatusResponse:
-    deleted = False
-    graph_id: Optional[str] = None
-
-    file_to_delete: Optional[tuple[str, str]] = None
-
-    with sqlite_conn(GRAPH_DB) as conn:
-        job = job_store.get(conn, job_id)
-        if job is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"error_code": "JOB_NOT_FOUND", "message": f"Unknown job id: {job_id}"},
-            )
-
-        # Cancel first if still running; decide what to delete from the
-        # *post-cancel* state so the response and cleanup never race the worker.
-        final = job if job.is_terminal() else (job_store.request_cancel(conn, job_id) or job)
-
-        if final.is_terminal():
-            graph_id = final.result_graph_id
-            if graph_id:
-                graph_store.delete(conn, graph_id)
-            job_store.delete(conn, job_id)
-
-            mapping = file_graph_store.get_by_job_id(conn, job_id)
-            if mapping is not None:
-                file_graph_store.delete_by_job_id(conn, job_id)
-                remaining = file_graph_store.get_by_channel_hash(
-                    conn, mapping.channel, mapping.file_hash)
-                if not remaining:
-                    file_to_delete = (mapping.channel, mapping.file_hash)
-
-            deleted = True
+    deleted, final, graph_id, file_to_delete, temp_path = await run_in_threadpool(
+        _remove_document_sync, job_id
+    )
 
     if deleted:
         if graph_id:
             graph_cache.invalidate(graph_id)
-        spool.discard(job.temp_path)
+        spool.discard(temp_path)
         if file_to_delete is not None:
-            file_store.delete_file(*file_to_delete)
+            await run_in_threadpool(file_store.delete_file, *file_to_delete)
 
     return JobStatusResponse(**final.to_status_payload())
 
@@ -348,8 +398,7 @@ async def get_document_file(
     graph_id: str = Path(..., description="Graph id returned from a completed job"),
     api_key: str = Depends(verify_api_key),
 ) -> StreamingResponse:
-    with sqlite_conn(GRAPH_DB) as conn:
-        mapping = file_graph_store.get_by_graph_id(conn, graph_id)
+    mapping = await run_in_threadpool(_get_mapping_by_graph_id_sync, graph_id)
 
     if mapping is None:
         raise HTTPException(
