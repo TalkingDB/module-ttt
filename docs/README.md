@@ -4,7 +4,7 @@ Everything about Text-to-Tree beyond the [README](../README.md), in one place. P
 
 | If you are | Read in this order |
 | :--- | :--- |
-| New to TTT | [Concepts](concepts.md) › [the README's four steps](../README.md#run-it-in-four-steps) › [Retrieval and demonstrations](retrieval-and-demonstrations.md) |
+| New to TTT | [Concepts](concepts.md) › [the README's four steps](reference.md#run-it-in-four-steps) › [Retrieval and demonstrations](retrieval-and-demonstrations.md) |
 | Building an app or agent on TTT | [API reference](api-reference.md) › [Fulfillment chat integration](fulfillment-chat-integration.md) › [sdk-talkingdb](https://github.com/TalkingDB/sdk-talkingdb) |
 | Tuning or debugging results | [Symbolic indexing](symbolic-indexing.md) › [Table extraction](table-extraction.md) › [Troubleshooting](troubleshooting.md) |
 | Comparing TTT with other [RAG](https://en.wikipedia.org/wiki/Retrieval-augmented_generation) approaches | [TTT vs. chunking](chunking-comparison.md) › [talkingdb-benchmarks](https://github.com/TalkingDB/talkingdb-benchmarks) |
@@ -27,3 +27,5 @@ Everything about Text-to-Tree beyond the [README](../README.md), in one place. P
 ## Pictures in these docs
 
 Screenshots in [`assets/readme/`](../assets/readme/) come from real runs of the service. Diagrams are drawn from the [Mermaid](https://mermaid.js.org/intro/) sources in [`diagrams/`](diagrams/) and committed as light and dark images, so they show on the web, in the GitHub mobile app and in editors.
+
+Also: [Full reference](reference.md), everything that used to be on the front page.
